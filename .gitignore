@@ -1,0 +1,11 @@
+# Environment variables
+.env
+
+# SQLite3 database
+database.db
+
+# Executable
+flood-social-rep
+
+# IDEA shit
+.idea

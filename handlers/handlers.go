@@ -148,7 +148,7 @@ func whaletop(bot *gotgbot.Bot, ctx *ext.Context) error {
 		top = top[:9]
 	}
 
-	topStr := "Топ рейтинга (наоборот):"
+	topStr := "Топ рейтинга по китам:"
 
 	for _, topPlace := range top {
 		if topPlace.Whales == 0 {

@@ -13,14 +13,14 @@ import (
 // Handle is a function which adds handlers to dispatcher.
 func Handle(dispatcher *ext.Dispatcher) {
 	// Rating-related commands
-	dispatcher.AddHandler(handlers.NewCommand("reptop", reptop))
-	dispatcher.AddHandler(handlers.NewCommand("revreptop", revreptop))
+	dispatcher.AddHandler(handlers.NewCommand("liketop", liketop))
+	dispatcher.AddHandler(handlers.NewCommand("disliketop", disliketop))
 	dispatcher.AddHandler(handlers.NewCommand("whaletop", whaletop))
 	dispatcher.AddHandler(handlers.NewCommand("rep", rep))
 }
 
-// Reputation top handler
-func reptop(bot *gotgbot.Bot, ctx *ext.Context) error {
+// Like top handler
+func liketop(bot *gotgbot.Bot, ctx *ext.Context) error {
 	top, err := database.TopRating(ctx.EffectiveChat.Id)
 	if err != nil {
 		return err
@@ -76,8 +76,8 @@ func reptop(bot *gotgbot.Bot, ctx *ext.Context) error {
 	return nil
 }
 
-// Reverse reputation top handler
-func revreptop(bot *gotgbot.Bot, ctx *ext.Context) error {
+// Dislike top handler
+func disliketop(bot *gotgbot.Bot, ctx *ext.Context) error {
 	top, err := database.TopRating(ctx.EffectiveChat.Id)
 	if err != nil {
 		return err

@@ -44,10 +44,17 @@ func Run() error {
 		return errors.New("WEB_PORT variable does not exist")
 	}
 
+	keyEnabledStr := os.Getenv("KEY_ENABLED")
+
+	var keyEnabled bool
+
+	if keyEnabledStr != "false" && keyEnabledStr != "" {
+		keyEnabled = true
+	}
+
 	key, exists := os.LookupEnv("KEY")
 	if !exists {
-		slog.Error("KEY variable does not exist!")
-		return errors.New("KEY variable does not exist")
+		slog.Warn("KEY variable does not exist!")
 	}
 
 	// Creating bot instance
@@ -85,7 +92,7 @@ func Run() error {
 	handlers.Handle(updater.Dispatcher)
 
 	// Create webserver instance
-	app := webserver.New(key)
+	app := webserver.New(key, keyEnabled)
 
 	// errch is a channel for errors
 	errch := make(chan error)

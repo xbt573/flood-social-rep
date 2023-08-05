@@ -8,14 +8,14 @@ import (
 )
 
 // New is a function for creating webserver instance
-func New(key string) *fiber.App {
+func New(key string, keyEnabled bool) *fiber.App {
 	app := fiber.New(fiber.Config{
 		// Remove this fucking fancy banner
 		DisableStartupMessage: true,
 	})
 
 	app.Post("/reactions", func(ctx *fiber.Ctx) error {
-		if query := ctx.Query("key"); query != key {
+		if query := ctx.Query("key"); query != key && keyEnabled {
 			return ctx.SendStatus(403)
 		}
 		var request models.Request

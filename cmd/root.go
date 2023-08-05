@@ -44,6 +44,12 @@ func Run() error {
 		return errors.New("WEB_PORT variable does not exist")
 	}
 
+	key, exists := os.LookupEnv("KEY")
+	if !exists {
+		slog.Error("KEY variable does not exist!")
+		return errors.New("KEY variable does not exist")
+	}
+
 	// Creating bot instance
 	bot, err := gotgbot.NewBot(token, &gotgbot.BotOpts{
 		Client: http.Client{},
@@ -79,7 +85,7 @@ func Run() error {
 	handlers.Handle(updater.Dispatcher)
 
 	// Create webserver instance
-	app := webserver.New()
+	app := webserver.New(key)
 
 	// errch is a channel for errors
 	errch := make(chan error)

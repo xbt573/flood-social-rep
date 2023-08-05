@@ -24,10 +24,6 @@ func New(key string, keyEnabled bool) *fiber.App {
 			return err
 		}
 
-		if request.FromUser.IsBot {
-			return nil
-		}
-
 		for _, reaction := range request.Reactions {
 			err := database.AddReaction(
 				request.Chat.Id,

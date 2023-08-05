@@ -27,7 +27,7 @@ func liketop(bot *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	sort.SliceStable(top, func(i, j int) bool {
-		return top[i].Likes < top[j].Likes
+		return top[i].Likes > top[j].Likes
 	})
 
 	if len(top) >= 10 {
@@ -84,7 +84,7 @@ func disliketop(bot *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	sort.SliceStable(top, func(i, j int) bool {
-		return top[i].Dislikes < top[j].Dislikes
+		return top[i].Dislikes > top[j].Dislikes
 	})
 
 	if len(top) >= 10 {
@@ -141,7 +141,7 @@ func whaletop(bot *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	sort.SliceStable(top, func(i, j int) bool {
-		return top[i].Whales < top[j].Whales
+		return top[i].Whales > top[j].Whales
 	})
 
 	if len(top) >= 10 {

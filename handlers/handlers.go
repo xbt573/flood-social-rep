@@ -127,6 +127,11 @@ func rep(bot *gotgbot.Bot, ctx *ext.Context) error {
 
 	// If command is a reply - do the same but for replied message
 	if ctx.EffectiveMessage.ReplyToMessage != nil {
+		// Ignore bot rep requests
+		if ctx.EffectiveMessage.ReplyToMessage.From.IsBot {
+			return nil
+		}
+
 		userId = ctx.EffectiveMessage.ReplyToMessage.From.Id
 		username = ctx.EffectiveMessage.ReplyToMessage.From.Username
 		if username == "" {

@@ -2,23 +2,20 @@
 package handlers
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 	"github.com/xbt573/flood-social-rep/database"
+	"sort"
 )
 
 // Handle is a function which adds handlers to dispatcher.
 func Handle(dispatcher *ext.Dispatcher) {
-	// Debug command, will be deleted on release
-	// TODO: REMOVE ON RELEASE
-	dispatcher.AddHandler(handlers.NewCommand("debug", debug))
-
 	// Rating-related commands
 	dispatcher.AddHandler(handlers.NewCommand("reptop", reptop))
 	dispatcher.AddHandler(handlers.NewCommand("revreptop", revreptop))
+	dispatcher.AddHandler(handlers.NewCommand("whaletop", whaletop))
 	dispatcher.AddHandler(handlers.NewCommand("rep", rep))
 }
 
@@ -29,9 +26,21 @@ func reptop(bot *gotgbot.Bot, ctx *ext.Context) error {
 		return err
 	}
 
+	sort.SliceStable(top, func(i, j int) bool {
+		return top[i].Likes < top[j].Likes
+	})
+
+	if len(top) >= 10 {
+		top = top[:9]
+	}
+
 	topStr := "Топ рейтинга:"
 
 	for _, topPlace := range top {
+		if topPlace.Likes == 0 {
+			continue
+		}
+
 		member, err := bot.GetChatMember(ctx.EffectiveChat.Id, topPlace.UserId, nil)
 		if err != nil {
 			continue
@@ -51,9 +60,11 @@ func reptop(bot *gotgbot.Bot, ctx *ext.Context) error {
 		}
 
 		topStr += fmt.Sprintf(
-			"\n%v: %v",
+			"\n%v: %v 👍 %v 👎 %v 🐳",
 			username,
-			topPlace.Rating,
+			topPlace.Likes,
+			topPlace.Dislikes,
+			topPlace.Whales,
 		)
 	}
 
@@ -67,14 +78,26 @@ func reptop(bot *gotgbot.Bot, ctx *ext.Context) error {
 
 // Reverse reputation top handler
 func revreptop(bot *gotgbot.Bot, ctx *ext.Context) error {
-	top, err := database.TopReverseRating(ctx.EffectiveChat.Id)
+	top, err := database.TopRating(ctx.EffectiveChat.Id)
 	if err != nil {
 		return err
+	}
+
+	sort.SliceStable(top, func(i, j int) bool {
+		return top[i].Dislikes < top[j].Dislikes
+	})
+
+	if len(top) >= 10 {
+		top = top[:9]
 	}
 
 	topStr := "Топ рейтинга (наоборот):"
 
 	for _, topPlace := range top {
+		if topPlace.Dislikes == 0 {
+			continue
+		}
+
 		member, err := bot.GetChatMember(ctx.EffectiveChat.Id, topPlace.UserId, nil)
 		if err != nil {
 			continue
@@ -94,9 +117,68 @@ func revreptop(bot *gotgbot.Bot, ctx *ext.Context) error {
 		}
 
 		topStr += fmt.Sprintf(
-			"\n%v: %v",
+			"\n%v: %v 👎 %v 👍 %v 🐳",
 			username,
-			topPlace.Rating,
+			topPlace.Dislikes,
+			topPlace.Likes,
+			topPlace.Whales,
+		)
+	}
+
+	_, err = ctx.EffectiveMessage.Reply(bot, topStr, nil)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Whale reputation top handler
+func whaletop(bot *gotgbot.Bot, ctx *ext.Context) error {
+	top, err := database.TopRating(ctx.EffectiveChat.Id)
+	if err != nil {
+		return err
+	}
+
+	sort.SliceStable(top, func(i, j int) bool {
+		return top[i].Whales < top[j].Whales
+	})
+
+	if len(top) >= 10 {
+		top = top[:9]
+	}
+
+	topStr := "Топ рейтинга (наоборот):"
+
+	for _, topPlace := range top {
+		if topPlace.Whales == 0 {
+			continue
+		}
+
+		member, err := bot.GetChatMember(ctx.EffectiveChat.Id, topPlace.UserId, nil)
+		if err != nil {
+			continue
+		}
+
+		// If username is doesn't exist - create it from first and last name
+		username := member.GetUser().Username
+		if username == "" {
+			username = member.GetUser().FirstName
+			if member.GetUser().LastName != "" {
+				username = fmt.Sprintf(
+					"%v %v",
+					member.GetUser().FirstName,
+					member.GetUser().LastName,
+				)
+			}
+		}
+
+		topStr += fmt.Sprintf(
+			"\n%v: %v 🐳 %v 👍 %v 👎",
+			username,
+			topPlace.Whales,
+			topPlace.Likes,
+			topPlace.Dislikes,
 		)
 	}
 
@@ -151,24 +233,15 @@ func rep(bot *gotgbot.Bot, ctx *ext.Context) error {
 		return err
 	}
 
-	message := fmt.Sprintf("%v: %v", username, rating.Rating)
+	message := fmt.Sprintf(
+		"\n%v: %v 👍 %v 👎 %v 🐳",
+		username,
+		rating.Likes,
+		rating.Dislikes,
+		rating.Whales,
+	)
 
 	_, err = ctx.EffectiveMessage.Reply(bot, message, nil)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Debug handler
-func debug(bot *gotgbot.Bot, ctx *ext.Context) error {
-	str, err := json.MarshalIndent(ctx.EffectiveMessage, "", "    ")
-	if err != nil {
-		return err
-	}
-
-	_, err = ctx.EffectiveMessage.Reply(bot, string(str), nil)
 	if err != nil {
 		return err
 	}

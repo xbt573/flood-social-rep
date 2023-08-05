@@ -4,7 +4,7 @@ package models
 // Request is a request from other bot to out server
 type Request struct {
 	// MessageId is a Telegram message ID
-	MessageId int `json:"message_id"`
+	MessageId int64 `json:"message_id"`
 
 	// Chat is a Telegram chat entity
 	Chat struct {

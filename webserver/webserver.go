@@ -29,44 +29,15 @@ func New(key string, keyEnabled bool) *fiber.App {
 		}
 
 		for _, reaction := range request.Reactions {
-			switch reaction.Emoji {
-			case "👍": // Positive reactions
-				fallthrough
-			case "🔥":
-				fallthrough
-			case "❤️":
-				fallthrough
-			case "👏":
-				fallthrough
-			case "💯":
-				err := database.IncrementUserRating(
-					request.MessageId,
-					request.Chat.Id,
-					reaction.From.Id,
-					request.FromUser.Id,
-				)
-
-				if err != nil {
-					return err
-				}
-
-			case "🤡": // Negative reactions
-				fallthrough
-			case "💩":
-				fallthrough
-			case "🤮":
-				fallthrough
-			case "👎":
-				err := database.DecrementUserRating(
-					request.MessageId,
-					request.Chat.Id,
-					reaction.From.Id,
-					request.FromUser.Id,
-				)
-
-				if err != nil {
-					return err
-				}
+			err := database.AddReaction(
+				request.Chat.Id,
+				reaction.From.Id,
+				request.FromUser.Id,
+				request.MessageId,
+				reaction.Emoji,
+			)
+			if err != nil {
+				return ctx.Status(500).SendString(err.Error())
 			}
 		}
 

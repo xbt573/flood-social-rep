@@ -6,11 +6,16 @@ import (
 	"errors"
 	_ "github.com/mattn/go-sqlite3" // side-effect import
 	"github.com/xbt573/flood-social-rep/models"
+	"golang.org/x/exp/maps"
 	"sync"
+	"time"
 )
 
 // mux is sync.Mutex which is locked where database operation is pending
 var mux = sync.Mutex{}
+
+// attempts is a last users reaction attempts
+var attempts []models.Attempt
 
 // Init is a function which initializes database for first time use
 // (if was not initialized before). Returns non-nil error if
@@ -26,18 +31,14 @@ func Init() error {
 	defer db.Close()
 
 	sqlStmt := `
-		CREATE TABLE IF NOT EXISTS rating (
-    		chat_id INTEGER NOT NULL,
-    		user_id INTEGER NOT NULL,
-    		rating INTEGER NOT NULL,
-
-    		PRIMARY KEY ( chat_id, user_id )
-		);
-
-		CREATE TABLE IF NOT EXISTS set_reactions (
-    		user_id INTEGER NOT NULL,
-    		chat_id INTEGER NOT NULL,
-    		message_id INTEGER NOT NULL
+		CREATE TABLE IF NOT EXISTS reactions(
+		    chat_id INTEGER NOT NULL,
+		    from_user_id INTEGER NOT NULL,
+		    user_id INTEGER NOT NULL,
+		    message_id INTEGER NOT NULL,
+		    reaction TEXT NOT NULL,
+		    
+		    PRIMARY KEY ( chat_id, from_user_id, user_id, message_id, reaction )
 		);
 	`
 
@@ -49,7 +50,7 @@ func Init() error {
 	return nil
 }
 
-// TopRating is a function which returns top 10 users by rating, descending
+// TopRating is a function which returns users rating
 func TopRating(chatId int64) ([]models.User, error) {
 	mux.Lock()
 	defer mux.Unlock()
@@ -60,31 +61,67 @@ func TopRating(chatId int64) ([]models.User, error) {
 	}
 	defer db.Close()
 
-	// Get top 10 users by rating, descending
 	rows, err := db.Query(
-		"SELECT * FROM rating WHERE chat_id=? ORDER BY rating DESC LIMIT 10",
+		`SELECT user_id, reaction FROM reactions WHERE chat_id=?`,
 		chatId,
 	)
 	if err != nil {
-		return []models.User{}, err
-	}
-	defer rows.Close()
+		if !errors.Is(err, sql.ErrNoRows) {
+			return []models.User{}, err
+		}
 
-	var users []models.User
+		return []models.User{}, nil
+	}
+
+	usermap := map[int64]models.User{}
 
 	for rows.Next() {
 		var userId int64
-		var rating int
+		var reaction string
 
-		err := rows.Scan(&chatId, &userId, &rating)
+		err := rows.Scan(&userId, &reaction)
 		if err != nil {
 			return []models.User{}, err
 		}
 
-		users = append(users, models.User{
-			UserId: userId,
-			Rating: rating,
-		})
+		if _, exists := usermap[userId]; !exists {
+			usermap[userId] = models.User{
+				UserId: userId,
+			}
+		}
+
+		switch reaction {
+		case "👍": // Positive reactions
+			fallthrough
+		case "🔥":
+			fallthrough
+		case "❤️":
+			fallthrough
+		case "👏":
+			fallthrough
+		case "💯":
+			tmp := usermap[userId]
+			tmp.Likes++
+
+			usermap[userId] = tmp
+		case "🤡": // Negative reactions
+			fallthrough
+		case "💩":
+			fallthrough
+		case "🤮":
+			fallthrough
+		case "👎":
+			tmp := usermap[userId]
+			tmp.Dislikes++
+
+			usermap[userId] = tmp
+
+		case "🐳": // whale bruh
+			tmp := usermap[userId]
+			tmp.Whales++
+
+			usermap[userId] = tmp
+		}
 	}
 
 	err = rows.Err()
@@ -92,53 +129,7 @@ func TopRating(chatId int64) ([]models.User, error) {
 		return []models.User{}, err
 	}
 
-	return users, nil
-}
-
-// TopReverseRating is a function which returns top 10 users by rating, ascending
-func TopReverseRating(chatId int64) ([]models.User, error) {
-	mux.Lock()
-	defer mux.Unlock()
-
-	db, err := sql.Open("sqlite3", "./database.db")
-	if err != nil {
-		return []models.User{}, err
-	}
-	defer db.Close()
-
-	// Get top 10 users by rating, ascending
-	rows, err := db.Query(
-		"SELECT * FROM rating WHERE chat_id=? ORDER BY rating ASC LIMIT 10",
-		chatId,
-	)
-	if err != nil {
-		return []models.User{}, err
-	}
-	defer rows.Close()
-
-	var users []models.User
-
-	for rows.Next() {
-		var userId int64
-		var rating int
-
-		err := rows.Scan(&chatId, &userId, &rating)
-		if err != nil {
-			return []models.User{}, err
-		}
-
-		users = append(users, models.User{
-			UserId: userId,
-			Rating: rating,
-		})
-	}
-
-	err = rows.Err()
-	if err != nil {
-		return []models.User{}, err
-	}
-
-	return users, nil
+	return maps.Values(usermap), nil
 }
 
 // GetUserRating is a function which returns rating for specific user.
@@ -152,146 +143,95 @@ func GetUserRating(chatId, userId int64) (models.User, error) {
 	}
 	defer db.Close()
 
-	row := db.QueryRow(
-		"SELECT * FROM rating WHERE chat_id=? AND user_id=?",
+	rows, err := db.Query(
+		`SELECT reaction FROM reactions WHERE chat_id=? AND user_id=?`,
 		chatId,
 		userId,
 	)
-
-	var rating int
-
-	// Scan row and create zero-rating user if error is equal
-	// to sql.ErrNoRows
-	err = row.Scan(&chatId, &userId, &rating)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			return models.User{}, err
 		}
 
-		_, err := db.Exec(
-			"INSERT INTO rating VALUES(?, ?, ?);",
-			chatId,
-			userId,
-			0,
-		)
+		return models.User{
+			UserId: userId,
+		}, nil
+	}
 
+	var user models.User
+
+	for rows.Next() {
+		var reaction string
+
+		err := rows.Scan(&reaction)
 		if err != nil {
 			return models.User{}, err
 		}
+
+		switch reaction {
+		case "👍": // Positive reactions
+			fallthrough
+		case "🔥":
+			fallthrough
+		case "❤️":
+			fallthrough
+		case "👏":
+			fallthrough
+		case "💯":
+			user.Likes++
+
+		case "🤡": // Negative reactions
+			fallthrough
+		case "💩":
+			fallthrough
+		case "🤮":
+			fallthrough
+		case "👎":
+			user.Dislikes++
+
+		case "🐳": // whale bruh
+			user.Whales++
+		}
 	}
 
-	return models.User{
-		UserId: userId,
-		Rating: rating,
-	}, nil
+	err = rows.Err()
+	if err != nil {
+		return models.User{}, err
+	}
+
+	return user, nil
 }
 
-// IncrementUserRating is a function which increments user rating
-func IncrementUserRating(messageId int, chatId, fromUserId, userId int64) error {
-	// No rating for you, buddy
-	if userId == fromUserId {
-		return nil
-	}
-
-	mux.Lock()
-	defer mux.Unlock()
-
-	db, err := sql.Open("sqlite3", "./database.db")
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-
-	row := db.QueryRow(
-		"SELECT * FROM set_reactions WHERE chat_id=? AND user_id=? AND message_id=?",
-		chatId,
-		fromUserId,
-		messageId,
-	)
-
-	// If error is equal to sql.ErrNoRows then allow increment reaction
-	// a, b, c is a dummy values!
-	var a, b, c any = nil, nil, nil
-	err = row.Scan(&a, &b, &c)
-	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
-			return err
-		}
-	} else {
-		return nil
-	}
-
-	row = db.QueryRow(
-		"SELECT * FROM rating WHERE chat_id=? AND user_id=?",
-		chatId,
-		userId,
-	)
-
-	var rating int
-
-	// Scan row and create zero-rating user if error is equal
-	// to sql.ErrNoRows
-	err = row.Scan(&chatId, &userId, &rating)
-	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
-			return err
-		}
-
-		_, err := db.Exec(
-			"INSERT INTO rating VALUES(?, ?, ?);",
-			chatId,
-			userId,
-			1,
-		)
-
-		if err != nil {
-			return err
-		}
-
-		_, err = db.Exec(
-			"INSERT INTO set_reactions VALUES(?, ?, ?)",
-			fromUserId,
-			chatId,
-			messageId,
-		)
-
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}
-
-	_, err = db.Exec(
-		"UPDATE rating SET rating=? WHERE user_id=? and chat_id=?;",
-		rating+1,
-		userId,
-		chatId,
-	)
-	if err != nil {
-		return err
-	}
-
-	_, err = db.Exec(
-		"INSERT INTO set_reactions VALUES(?, ?, ?)",
-		fromUserId,
-		chatId,
-		messageId,
-	)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// DecrementUserRating is a function which decrements user rating
-func DecrementUserRating(messageId int, chatId, fromUserId, userId int64) error {
+// AddReaction is a function which adds reaction to database
+func AddReaction(chatId, fromUserId, userId, messageId int64, reaction string) error {
 	// No karma for you, buddy
 	if userId == fromUserId {
 		return nil
 	}
 
+	var attemptExists bool
+	for idx, attempt := range attempts {
+		if attempt.UserId != fromUserId {
+			continue
+		}
+
+		attemptExists = true
+		attempts[idx].Time = time.Now()
+
+		if time.Since(attempt.Time) <= 15*time.Second {
+			return nil
+		}
+
+		break
+	}
+
+	if !attemptExists {
+		attempts = append(attempts, models.Attempt{
+			UserId: fromUserId,
+			Time:   time.Now(),
+		})
+	}
+
 	mux.Lock()
 	defer mux.Unlock()
 
@@ -301,82 +241,15 @@ func DecrementUserRating(messageId int, chatId, fromUserId, userId int64) error 
 	}
 	defer db.Close()
 
-	row := db.QueryRow(
-		"SELECT * FROM set_reactions WHERE chat_id=? AND user_id=? AND message_id=?",
+	_, err = db.Exec(
+		`INSERT INTO reactions VALUES(?, ?, ?, ?, ?)`,
 		chatId,
 		fromUserId,
-		messageId,
-	)
-
-	// If errors is sql.ErrNoRows then allow decrementing rating
-	// a, b, c is a dummy values!
-	var a, b, c any = nil, nil, nil
-	err = row.Scan(&a, &b, &c)
-	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
-			return err
-		}
-	} else {
-		return nil
-	}
-
-	row = db.QueryRow(
-		"SELECT * FROM rating WHERE chat_id=? AND user_id=?",
-		chatId,
 		userId,
-	)
-
-	var rating int
-
-	// Scan row and create zero-rating user if error is equal
-	// to sql.ErrNoRows
-	err = row.Scan(&chatId, &userId, &rating)
-	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
-			return err
-		}
-
-		_, err := db.Exec(
-			"INSERT INTO rating VALUES(?, ?, ?);",
-			chatId,
-			userId,
-			1,
-		)
-
-		if err != nil {
-			return err
-		}
-
-		_, err = db.Exec(
-			"INSERT INTO set_reactions VALUES(?, ?, ?)",
-			fromUserId,
-			chatId,
-			messageId,
-		)
-
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}
-
-	_, err = db.Exec(
-		"UPDATE rating SET rating=? WHERE user_id=? and chat_id=?;",
-		rating-1,
-		userId,
-		chatId,
-	)
-	if err != nil {
-		return err
-	}
-
-	_, err = db.Exec(
-		"INSERT INTO set_reactions VALUES(?, ?, ?)",
-		fromUserId,
-		chatId,
 		messageId,
+		reaction,
 	)
+
 	if err != nil {
 		return err
 	}

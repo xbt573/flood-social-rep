@@ -6,6 +6,12 @@ type User struct {
 	// User ID, 64 bit
 	UserId int64
 
-	// User rating
-	Rating int
+	// User likes
+	Likes int
+
+	// User dislikes
+	Dislikes int
+
+	// User whales 🐳
+	Whales int
 }

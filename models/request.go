@@ -16,6 +16,9 @@ type Request struct {
 	FromUser struct {
 		// FromUser -> Id is a User ID
 		Id int64 `json:"id"`
+
+		// FromUser -> IsBot is true if message sender is bot
+		IsBot bool `json:"is_bot"`
 	} `json:"from_user"`
 
 	// Reactions is a Telegram reactions list

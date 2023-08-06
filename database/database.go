@@ -16,7 +16,7 @@ import (
 var mux = sync.Mutex{}
 
 // attempts is a last users reaction attempts
-var attempts []models.Attempt
+var attempts = map[int64]time.Time{}
 
 // Blacklist errors
 var (
@@ -221,27 +221,22 @@ func AddReaction(chatId, fromUserId, userId, messageId int64, reaction string) e
 		return nil
 	}
 
-	var attemptExists bool
-	for idx, attempt := range attempts {
-		if attempt.UserId != fromUserId {
+	attemptExists := false
+	for id, attempt := range attempts {
+		if userId != id {
 			continue
 		}
 
 		attemptExists = true
-		attempts[idx].Time = time.Now()
+		attempts[id] = time.Now()
 
-		if time.Since(attempt.Time) <= 15*time.Second {
+		if time.Since(attempt) < time.Second*15 {
 			return nil
 		}
-
-		break
 	}
 
 	if !attemptExists {
-		attempts = append(attempts, models.Attempt{
-			UserId: fromUserId,
-			Time:   time.Now(),
-		})
+		attempts[userId] = time.Now()
 	}
 
 	mux.Lock()

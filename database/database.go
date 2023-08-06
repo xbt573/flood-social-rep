@@ -7,6 +7,7 @@ import (
 	_ "github.com/mattn/go-sqlite3" // side-effect import
 	"github.com/xbt573/flood-social-rep/models"
 	"golang.org/x/exp/maps"
+	"strings"
 	"sync"
 	"time"
 )
@@ -16,6 +17,12 @@ var mux = sync.Mutex{}
 
 // attempts is a last users reaction attempts
 var attempts []models.Attempt
+
+// Blacklist errors
+var (
+	ErrAlreadyBlacklisted = errors.New("user already in blacklist")
+	ErrNotInBlacklist     = errors.New("user is not in blacklist")
+)
 
 // Init is a function which initializes database for first time use
 // (if was not initialized before). Returns non-nil error if
@@ -39,6 +46,11 @@ func Init() error {
 		    reaction TEXT NOT NULL,
 		    
 		    PRIMARY KEY ( chat_id, from_user_id, user_id, message_id, reaction )
+		);
+
+		CREATE TABLE IF NOT EXISTS blacklist(
+			chat_id INTEGER NOT NULL,
+			user_id INTEGER NOT NULL  
 		);
 	`
 
@@ -241,6 +253,24 @@ func AddReaction(chatId, fromUserId, userId, messageId int64, reaction string) e
 	}
 	defer db.Close()
 
+	row := db.QueryRow(
+		"SELECT * FROM blacklist WHERE chat_id=? AND user_id=?",
+		chatId,
+		userId,
+	)
+
+	// dummy values
+	var a, b any = nil, nil
+	err = row.Scan(&a, &b)
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+	} else {
+		// blacklist clause
+		return nil
+	}
+
 	_, err = db.Exec(
 		`INSERT INTO reactions VALUES(?, ?, ?, ?, ?)`,
 		chatId,
@@ -250,6 +280,87 @@ func AddReaction(chatId, fromUserId, userId, messageId int64, reaction string) e
 		reaction,
 	)
 
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			// ignore constraint error 🐳
+			return nil
+		}
+
+		return err
+	}
+
+	return nil
+}
+
+// AddBlacklist is a function which adds user into blacklist
+func AddBlacklist(chatId, userId int64) error {
+	mux.Lock()
+	defer mux.Unlock()
+
+	db, err := sql.Open("sqlite3", "./database.db")
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	row := db.QueryRow(
+		"SELECT * FROM blacklist WHERE chat_id=? AND user_id=?",
+		chatId,
+		userId,
+	)
+
+	// dummy values
+	var a, b any = nil, nil
+	err = row.Scan(&a, &b)
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+	} else {
+		return ErrAlreadyBlacklisted
+	}
+
+	_, err = db.Exec(`INSERT INTO blacklist VALUES(?, ?)`, chatId, userId)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// RemoveBlacklist is a function which removes user from blacklist
+func RemoveBlacklist(chatId, userId int64) error {
+	mux.Lock()
+	defer mux.Unlock()
+
+	db, err := sql.Open("sqlite3", "./database.db")
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	row := db.QueryRow(
+		"SELECT * FROM blacklist WHERE chat_id=? AND user_id=?",
+		chatId,
+		userId,
+	)
+
+	// dummy values
+	var a, b any = nil, nil
+	err = row.Scan(&a, &b)
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+
+		return ErrNotInBlacklist
+	}
+
+	_, err = db.Exec(
+		"DELETE FROM blacklist WHERE chat_id=? AND user_id=?",
+		chatId,
+		userId,
+	)
 	if err != nil {
 		return err
 	}

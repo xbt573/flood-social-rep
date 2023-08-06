@@ -2,6 +2,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -16,7 +17,93 @@ func Handle(dispatcher *ext.Dispatcher) {
 	dispatcher.AddHandler(handlers.NewCommand("liketop", liketop))
 	dispatcher.AddHandler(handlers.NewCommand("disliketop", disliketop))
 	dispatcher.AddHandler(handlers.NewCommand("whaletop", whaletop))
+	dispatcher.AddHandler(handlers.NewCommand("repignore", repignore))
+	dispatcher.AddHandler(handlers.NewCommand("repunignore", repunignore))
 	dispatcher.AddHandler(handlers.NewCommand("rep", rep))
+}
+
+func repignore(bot *gotgbot.Bot, ctx *ext.Context) error {
+	member, err := bot.GetChatMember(ctx.EffectiveChat.Id, ctx.EffectiveUser.Id, nil)
+	if err != nil {
+		return err
+	}
+
+	if member.GetStatus() == "member" {
+		_, err := ctx.EffectiveMessage.Reply(bot, "у тебя нет прав ALO🔉🔉🔉", nil)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	if ctx.EffectiveMessage.ReplyToMessage == nil {
+		_, err := ctx.EffectiveMessage.Reply(bot, "Команда должна быть ответом", nil)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	err = database.AddBlacklist(
+		ctx.EffectiveChat.Id,
+		ctx.EffectiveMessage.ReplyToMessage.From.Id,
+	)
+	if err != nil {
+		if !errors.Is(err, database.ErrAlreadyBlacklisted) {
+			return err
+		}
+
+		_, err := ctx.EffectiveMessage.Reply(bot, "Юзер уже в игноре", nil)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func repunignore(bot *gotgbot.Bot, ctx *ext.Context) error {
+	member, err := bot.GetChatMember(ctx.EffectiveChat.Id, ctx.EffectiveUser.Id, nil)
+	if err != nil {
+		return err
+	}
+
+	if member.GetStatus() == "member" {
+		_, err := ctx.EffectiveMessage.Reply(bot, "у тебя нет прав ALO🔉🔉🔉", nil)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	if ctx.EffectiveMessage.ReplyToMessage == nil {
+		_, err := ctx.EffectiveMessage.Reply(bot, "Команда должна быть ответом", nil)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	err = database.RemoveBlacklist(
+		ctx.EffectiveChat.Id,
+		ctx.EffectiveMessage.ReplyToMessage.From.Id,
+	)
+	if err != nil {
+		if !errors.Is(err, database.ErrNotInBlacklist) {
+			return err
+		}
+
+		_, err := ctx.EffectiveMessage.Reply(bot, "Юзер уже не в игноре", nil)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Like top handler

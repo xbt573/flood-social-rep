@@ -52,6 +52,11 @@ func Init() error {
 			chat_id INTEGER NOT NULL,
 			user_id INTEGER NOT NULL  
 		);
+
+		CREATE TABLE IF NOT EXISTS username(
+		    user_id INTEGER NOT NULL,
+		    username TEXT NOT NULL
+		);
 	`
 
 	_, err = db.Exec(sqlStmt)
@@ -361,4 +366,69 @@ func RemoveBlacklist(chatId, userId int64) error {
 	}
 
 	return nil
+}
+
+// UpdateUsername is a function which adds username into database
+// (used when getChatMember is fucked)
+func UpdateUsername(userId int64, username string) error {
+	mux.Lock()
+	defer mux.Unlock()
+
+	db, err := sql.Open("sqlite3", "./database.db")
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	row := db.QueryRow("SELECT * FROM username WHERE user_id=?", userId)
+
+	// dummy
+	var a, b any = nil, nil
+	err = row.Scan(&a, &b)
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+
+		_, err = db.Exec("INSERT INTO username VALUES(?, ?)", userId, username)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	_, err = db.Exec(
+		"UPDATE username SET username=? WHERE user_id=?",
+		username,
+		userId,
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// GetUsername is a function which gets username from database
+// (used when getChatMember is fucked)
+func GetUsername(userId int64) (string, error) {
+	mux.Lock()
+	defer mux.Unlock()
+
+	db, err := sql.Open("sqlite3", "./database.db")
+	if err != nil {
+		return "", err
+	}
+	defer db.Close()
+
+	row := db.QueryRow("SELECT username FROM username WHERE user_id=?", userId)
+
+	var username string
+	err = row.Scan(&username)
+	if err != nil {
+		return "", err
+	}
+
+	return username, nil
 }

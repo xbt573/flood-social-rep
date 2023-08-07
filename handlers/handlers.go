@@ -128,21 +128,27 @@ func liketop(bot *gotgbot.Bot, ctx *ext.Context) error {
 			continue
 		}
 
+		var username string
+
 		member, err := bot.GetChatMember(ctx.EffectiveChat.Id, topPlace.UserId, nil)
 		if err != nil {
-			continue
-		}
+			name, err := database.GetUsername(topPlace.UserId)
+			if err != nil {
+				continue
+			}
 
-		// If username is doesn't exist - create it from first and last name
-		username := member.GetUser().Username
-		if username == "" {
-			username = member.GetUser().FirstName
-			if member.GetUser().LastName != "" {
-				username = fmt.Sprintf(
-					"%v %v",
-					member.GetUser().FirstName,
-					member.GetUser().LastName,
-				)
+			username = name
+		} else {
+			username = member.GetUser().Username
+			if username == "" {
+				username = member.GetUser().FirstName
+				if member.GetUser().LastName != "" {
+					username = fmt.Sprintf(
+						"%v %v",
+						member.GetUser().FirstName,
+						member.GetUser().LastName,
+					)
+				}
 			}
 		}
 
@@ -185,21 +191,27 @@ func disliketop(bot *gotgbot.Bot, ctx *ext.Context) error {
 			continue
 		}
 
+		var username string
+
 		member, err := bot.GetChatMember(ctx.EffectiveChat.Id, topPlace.UserId, nil)
 		if err != nil {
-			continue
-		}
+			name, err := database.GetUsername(topPlace.UserId)
+			if err != nil {
+				continue
+			}
 
-		// If username is doesn't exist - create it from first and last name
-		username := member.GetUser().Username
-		if username == "" {
-			username = member.GetUser().FirstName
-			if member.GetUser().LastName != "" {
-				username = fmt.Sprintf(
-					"%v %v",
-					member.GetUser().FirstName,
-					member.GetUser().LastName,
-				)
+			username = name
+		} else {
+			username = member.GetUser().Username
+			if username == "" {
+				username = member.GetUser().FirstName
+				if member.GetUser().LastName != "" {
+					username = fmt.Sprintf(
+						"%v %v",
+						member.GetUser().FirstName,
+						member.GetUser().LastName,
+					)
+				}
 			}
 		}
 
@@ -242,21 +254,27 @@ func whaletop(bot *gotgbot.Bot, ctx *ext.Context) error {
 			continue
 		}
 
+		var username string
+
 		member, err := bot.GetChatMember(ctx.EffectiveChat.Id, topPlace.UserId, nil)
 		if err != nil {
-			continue
-		}
+			name, err := database.GetUsername(topPlace.UserId)
+			if err != nil {
+				continue
+			}
 
-		// If username is doesn't exist - create it from first and last name
-		username := member.GetUser().Username
-		if username == "" {
-			username = member.GetUser().FirstName
-			if member.GetUser().LastName != "" {
-				username = fmt.Sprintf(
-					"%v %v",
-					member.GetUser().FirstName,
-					member.GetUser().LastName,
-				)
+			username = name
+		} else {
+			username = member.GetUser().Username
+			if username == "" {
+				username = member.GetUser().FirstName
+				if member.GetUser().LastName != "" {
+					username = fmt.Sprintf(
+						"%v %v",
+						member.GetUser().FirstName,
+						member.GetUser().LastName,
+					)
+				}
 			}
 		}
 

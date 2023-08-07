@@ -35,6 +35,19 @@ func New(key string, keyEnabled bool) *fiber.App {
 			if err != nil {
 				return ctx.Status(500).SendString(err.Error())
 			}
+
+			username := request.FromUser.Username
+			if username == "" {
+				username = request.FromUser.FirstName
+				if request.FromUser.LastName != "" {
+					username = username + " " + request.FromUser.LastName
+				}
+			}
+
+			err = database.UpdateUsername(request.FromUser.Id, username)
+			if err != nil {
+				return ctx.Status(500).SendString(err.Error())
+			}
 		}
 
 		return nil

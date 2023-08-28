@@ -9,6 +9,7 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 	"github.com/xbt573/flood-social-rep/database"
 	"sort"
+	"strconv"
 )
 
 // Handle is a function which adds handlers to dispatcher.
@@ -20,6 +21,7 @@ func Handle(dispatcher *ext.Dispatcher) {
 	dispatcher.AddHandler(handlers.NewCommand("repignore", repignore))
 	dispatcher.AddHandler(handlers.NewCommand("repunignore", repunignore))
 	dispatcher.AddHandler(handlers.NewCommand("rep", rep))
+	dispatcher.AddHandler(handlers.NewCommand("reactions", reactions))
 }
 
 func repignore(bot *gotgbot.Bot, ctx *ext.Context) error {
@@ -334,7 +336,7 @@ func rep(bot *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	message := fmt.Sprintf(
-		"\n%v: %v 👍 %v 👎 %v 🐳",
+		"%v: %v 👍 %v 👎 %v 🐳",
 		username,
 		rating.Likes,
 		rating.Dislikes,
@@ -342,6 +344,80 @@ func rep(bot *gotgbot.Bot, ctx *ext.Context) error {
 	)
 
 	_, err = ctx.EffectiveMessage.Reply(bot, message, nil)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func reactions(bot *gotgbot.Bot, ctx *ext.Context) error {
+	var id int64
+
+	if ctx.EffectiveMessage.ReplyToMessage != nil {
+		id = ctx.EffectiveMessage.ReplyToMessage.MessageId
+	}
+
+	args := ctx.Args()
+	if len(args) > 0 {
+		num, err := strconv.ParseInt(args[0], 10, 64)
+		if err != nil {
+			_, err := ctx.EffectiveMessage.Reply(bot, "Failed to parse id", nil)
+			if err != nil {
+				return err
+			}
+
+			return err
+		}
+
+		id = num
+	}
+
+	reactions, err := database.GetReactions(ctx.EffectiveChat.Id, id)
+	if err != nil {
+		return err
+	}
+
+	if len(reactions) == 0 {
+		_, err := ctx.EffectiveMessage.Reply(bot, "No reactions found", nil)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	var resStr string
+
+	for _, x := range reactions {
+		var username string
+
+		member, err := bot.GetChatMember(ctx.EffectiveChat.Id, x.UserId, nil)
+		if err != nil {
+			name, err := database.GetUsername(x.UserId)
+			if err != nil {
+				continue
+			}
+
+			username = name
+		} else {
+			username = member.GetUser().Username
+			if username == "" {
+				username = member.GetUser().FirstName
+				if member.GetUser().LastName != "" {
+					username = fmt.Sprintf(
+						"%v %v",
+						member.GetUser().FirstName,
+						member.GetUser().LastName,
+					)
+				}
+			}
+		}
+
+		resStr += fmt.Sprintf("%v - %v\n", username, x.Reaction)
+	}
+
+	_, err = ctx.EffectiveMessage.Reply(bot, resStr, nil)
 	if err != nil {
 		return err
 	}

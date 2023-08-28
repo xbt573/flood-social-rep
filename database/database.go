@@ -432,3 +432,53 @@ func GetUsername(userId int64) (string, error) {
 
 	return username, nil
 }
+
+// GetReactions is a function which returns reactions set on messageId in chatId
+func GetReactions(chatId, messageId int64) ([]models.Reaction, error) {
+	mux.Lock()
+	defer mux.Unlock()
+
+	db, err := sql.Open("sqlite3", "./database.db")
+	if err != nil {
+		return []models.Reaction{}, err
+	}
+	defer db.Close()
+
+	rows, err := db.Query(
+		"SELECT from_user_id, reaction FROM reactions WHERE chat_id=? AND message_id=?",
+		chatId,
+		messageId,
+	)
+
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return []models.Reaction{}, err
+		}
+
+		return []models.Reaction{}, nil
+	}
+
+	var reactions []models.Reaction
+
+	for rows.Next() {
+		var fromUserId int64
+		var reaction string
+
+		err := rows.Scan(&fromUserId, &reaction)
+		if err != nil {
+			return []models.Reaction{}, err
+		}
+
+		reactions = append(reactions, models.Reaction{
+			UserId:   fromUserId,
+			Reaction: reaction,
+		})
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return []models.Reaction{}, err
+	}
+
+	return reactions, nil
+}

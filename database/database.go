@@ -116,7 +116,9 @@ func TopRating(chatId int64) ([]models.User, error) {
 			fallthrough
 		case "🔥":
 			fallthrough
-		case "❤️":
+		case "❤":
+			fallthrough
+		case "❤‍🔥":
 			fallthrough
 		case "👏":
 			fallthrough
@@ -194,7 +196,9 @@ func GetUserRating(chatId, userId int64) (models.User, error) {
 			fallthrough
 		case "🔥":
 			fallthrough
-		case "❤️":
+		case "❤":
+			fallthrough
+		case "❤‍🔥":
 			fallthrough
 		case "👏":
 			fallthrough

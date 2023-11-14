@@ -19,7 +19,7 @@ var (
 	// attempts is a last users reaction attempts
 	attempts = map[int64]time.Time{}
 	// attemptsmux is a mutex for data race security
-	attemptsmux = sync.RWMutex{}
+	attemptsmux = sync.Mutex{}
 )
 
 // Blacklist errors
@@ -234,7 +234,7 @@ func AddReaction(chatId, fromUserId, userId, messageId int64, reaction string) e
 		return nil
 	}
 
-	attemptsmux.RLock()
+	attemptsmux.Lock()
 
 	attemptExists := false
 	for id, attempt := range attempts {
@@ -246,12 +246,12 @@ func AddReaction(chatId, fromUserId, userId, messageId int64, reaction string) e
 		attempts[id] = time.Now()
 
 		if time.Since(attempt) < time.Second*15 {
-			attemptsmux.RUnlock()
+			attemptsmux.Unlock()
 			return nil
 		}
 	}
 
-	attemptsmux.RUnlock()
+	attemptsmux.Unlock()
 
 	if !attemptExists {
 		attemptsmux.Lock()
